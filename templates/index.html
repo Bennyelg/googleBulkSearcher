@@ -1,0 +1,36 @@
+<html>
+<head>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="container-fluid">
+            <b>Total time fetched: {{total_time}} Seconds.</b></br>
+            <b>Engine: google.com</b>
+<table class="table table-hover table-bordered">
+    <tr>
+    <th class="text-center">#</th>
+    <th class="text-center">Search term</th>
+    <th class="text-center">First result title</th>
+    <th class="text-center">First result description</th>
+    <th class="text-center">First result link</th>
+    </tr>
+{% for result in results %}
+    <tr>
+    <td class="text-center">{{loop.index}}</td>
+    <td class="text-center">{{result['Term']}}</td>
+    <td class="text-center">{{result['Title']}}</td>
+    <td class="text-center">{{result['Description']}}</td>
+    <td class="text-center"><a href=http://{{result['Link']}}>Click to move</a></td>
+    </tr>
+{% endfor %}
+</table>
+</div>
+</body>
+</html>
