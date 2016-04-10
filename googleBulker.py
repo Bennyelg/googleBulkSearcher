@@ -104,7 +104,7 @@ def main(cnt):
     random_words = search_paths_generator(cnt)
     # mapping the work throw processes and return mid result set.
     result_set = p.map(get_word_search_results, random_words)
-    # p.join()
+    p.close()
     # Catch done time
     end = time.time()
     return render_template('index.html', title="Result set",
