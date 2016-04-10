@@ -2,10 +2,14 @@ import requests
 import random
 import re
 import time
+import threading
 import string
+import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
+from fake_useragent import UserAgent
 from flask import Flask, render_template
 
 
@@ -24,44 +28,48 @@ def get_word_search_results(word):
     # @returns:  dict of result with the following keys:
     #            Term, Title, Link, Description
 
+    global ua
+    retry = 0
     # Hidden value is generate a 15 chars long sequence to randomize the search.
     # This is some "Workaround" to allow high capacity of search before getting
     # Maximum tries exceed.
     hidden = "".join([random.choice(string.ascii_uppercase) for _ in xrange(15)])
-    link = 'http://www.google.com/search?q=' + word + '&gws_rd=cr,ssl&ei=XesHV7-' + hidden
+    link = 'http://www.google.com/search?q=' + word + '&gws_rd=cr,ssl&ei=' + hidden
     # print ('Fetching search results for: ' + word)
     # Request the data using `get`
     with requests.Session() as s:
-        r = requests.get(link)
+        r = requests.get(link, headers={'User-Agent': ua.google})
+    # If the status code was different than 200.
+    # We try to fake an User-agent in-order to complete the google data fetch.
     if r.status_code != 200:
-        raise Exception("Error code is not allow to fetch data: {}".format(r.status_code))
-    else:
-        # Using bs4 to get the request content.
-        content = BeautifulSoup(r.text)
-        # Fetching results. (description, title, link)
-        result = content.find_all("h3", {"class": "r"})[0]
-        result_descrip = content.find_all("div", {"class": "s"})[0]
-        description = result_descrip.find_all("span", {"class": "st"})[0]
-        # Get the link from the description.
-        for link in result_descrip.findAll('a'):
-            link = link.get('href')
-            break
-        # Clean-ups.
-        # - Cleanups is simply to clean-up un-needed tags,
-        #   such html tags and non readable tags.
-        try:
-            title = re.sub('<[^<]+?>', '', unicode(result))
-            try:
-                link = unicode(link.replace('/url?q=', '')).split('://')[2]
-            except IndexError as ind_err:
-                link = unicode(link.replace('/url?q=', '')).split('://')[1]
-            link = link.split('%')[0]
-            description = re.sub('<[^<]+?>', '', unicode(description))
-            # Return a set of cleaned ready to display term result.
-            return {"Term": unicode(word), "Title": unicode(title),
-                    "Link": link, "Description": unicode(description)}
-        except Exception as parse_err:
-            pass
+        # Seted a count of 15 tries to pull it out.
+        while retry != 15:
+            retry += 1
+            r = requests.get(link, headers={'User-Agent': ua.google})
+            # If we did it we break and continue.
+            if r.status_code == 200:
+                break
+        # Nothing help since status code is not 200 we are doomed to death
+        if r.status_code != 200:
+            raise Exception("Error code is not allow to fetch data: {}".format(r.status_code))
+    # Using bs4 to get the request content.
+    content = BeautifulSoup(r.text)
+    # Fetching results. (description, title, link)
+    result = content.find_all("h3", {"class": "r"})[0]
+    result_descrip = content.find_all("div", {"class": "s"})[0]
+    description = content.find_all("span", {"class": "st"})[0]
+
+    try:
+        url_link = content.findAll('cite', attrs={'class':'_Rm'})[0].text
+    except IndexError as err:
+        url_link = ''
+
+    title = re.sub('<[^<]+?>', '', unicode(result))
+    description = re.sub('<[^<]+?>', '', unicode(description))
+    # Return a set of cleaned ready to display term result.
+
+    return {"Term": unicode(word), "Title": unicode(title),
+            "Link": url_link, "Description": unicode(description)}
 
 
 def search_paths_generator(amount):
@@ -93,22 +101,19 @@ def main(cnt):
     # /* by the amount the user input, set html page to be display */
     # /* with the results found. */
     # @returns:  render_template - ready html.
+
     # Catch start time.
     start = time.time()
-    # Create the processes pool according to the machine cpu count.
-    # Since multi-threading is not a good option to use in python.
-    # I selected a multiprocessing module knowing we got a little bit overhead
-    # when setting-up the processes.
-    p = Pool(processes=multiprocessing.cpu_count())
-    # Get the random words from the site by the cnt value the user selected.
+    results_wallet = []
     random_words = search_paths_generator(cnt)
-    # mapping the work throw processes and return mid result set.
-    result_set = p.map(get_word_search_results, random_words)
-    p.close()
+    pool = ThreadPool(processes=30)
+    results_wallet = pool.map(get_word_search_results, random_words)
+    pool.close()
+    #p.close()
     # Catch done time
     end = time.time()
     return render_template('index.html', title="Result set",
-                           results=result_set, total_time=(end - start))
+                           results=results_wallet, total_time=(end - start))
 
 
 if __name__ == '__main__':
@@ -121,4 +126,5 @@ if __name__ == '__main__':
     # >> 50 requests => 12.0 sec.
     # >> 1 requests => 3.0 sec.
     words = None
+    ua = UserAgent(cache=False)
     app.run(debug=True, port=8000)
